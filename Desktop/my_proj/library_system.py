@@ -1,4 +1,6 @@
 import mysql.connector
+from datetime import date
+from random import randint 
 class books:
     def __init__(self):
         book_name=None
@@ -17,6 +19,8 @@ class books:
             set num_of_books=num_of_books+%s
             where book_id=%s
             ''',(num_of_books,book_id))
+        my_cur.execute("commit")
+
     
     def delete_book(self,book_id):
         my_cur.execute("select book_id from Book_tab where book_id=%s", (book_id,))
@@ -35,18 +39,113 @@ class books:
             raise Exception("No such books found!")
         return data
     
-    def issue_book(self,b_name=None,b_id=None):
-        data=self.search_book(book_name=b_name , book_id=b_id)
-        Cust_name=input("Enter customer name:-")
-        mob_num=input("Enter mobile number:-")
-        issue_date=input()
+    def reg_member(self):
+        cust_name=input("Enter customer name:-")
+        try:
+            mob_num=int(input("Enter mobile number:-"))
+        except:
+            raise Exception("Enter valid details") 
+        
+        if len(str(mob_num))<10 :
+            raise Exception("Enter valid details") 
+        my_cur.execute("select mob_num from customer_table where mob_num=%s", (mob_num,))
+        data= my_cur.fetchall()
+        if len(data)==0:
+            mem_id=str(randint(0,9))
+            for i in range(6):
+	            mem_id+=str(randint(0,9))
+            my_cur.execute('''insert into customer_table values(%s,%s,%s,%s)''',(cust_name,str(mob_num),mem_id,0))
+            my_cur.execute('''commit''')
 
-        
-        
-        
+        else:
+            raise Exception("This mobile number already exists")
+            
+
+            
+    def verify_user(self):
+        pwd=input("Enter your user id:-")
+        my_cur.execute("select mem_id from customer_table where mem_id=%s", (pwd,))
+        data=my_cur.fetchall()
+        if len(data)==0:
+            raise Exception("No records with this id")
+            return False
+        else:   
+            return True
     
+    def reserve_book(self,book_id):
+        print("Your book is reserved")
+    
+    def issue_book(self):
+        if self.verify_user()==True:
+            b_id=input("Enter id  of book:")
+            data=self.search_book(book_id=b_id)
+            
+            if len(data)==0:
+                raise Exception("No records with this id")
+            
+            else:
+                if data[0][6]>0:
+                    mem_id=input("Please enter ur user id:-")
+                    
+                    my_cur.execute("select * from customer_table where mem_id=%s", (mem_id,))
+                    nob_data=my_cur.fetchall()
+                    
+                    if nob_data[0][3]<5:
+                        my_cur.execute("select book_id from issue_book_table where book_id=%s and customer_id=%s", (b_id,mem_id))
+                        nosb=my_cur.fetchall()
+                        print(nosb)
+                        if len(nosb)>1:
+                            raise Exception("Sorry you cannot take same book again")
+                        else:        
+                            my_cur.execute('''insert into issue_book_table values(%s,%s,%s,%s)''',(mem_id,b_id,date.today(),None))
+                        
+                            my_cur.execute('''update Book_tab 
+                                              set num_of_books=num_of_books-1 
+                                              where book_id=%s ''',(b_id,))
+                            
+                            my_cur.execute('''update customer_table
+                                              set cust_books=cust_books+1
+                                              where mem_id=%s''',(mem_id,))
+                            my_cur.execute('''commit''')
+                    else:
+                        raise Exception('We are sorry,but you cannot take more than 5 books')
+                else:
+                    print("OOPS! the book is   out of stock")
+                    ch=input('Would u like to reserve this book?(y/n)')
+                    if ch=='y':
+                        self.reserve_book(b_id)
+                    else:
+                        raise Exception("Come back next time")
+    
+        else:
+            raise Exception("Please register as member")
+    
+    def deposit_book(self,book_id):
+        if self.verify_user()==True:
+            my_cur.execute("select issue_date from issue_book_table where book_id=%s",(book_id,))
+            submit_date=date(2021,11,24)
+            data=my_cur.fetchall()
+            diff=submit_date-data[0][0]
+            if diff.days>10:
+                fine=(diff.days-10)*10
+                print("Please pay a fine of Rs.",fine," for further process")
+                return
+            else:
+                mem_id=input("Please enter ur user id:-")
+                
+                my_cur.execute('''update Book_tab 
+                                  set num_of_books=num_of_books+1 
+                                  where book_id=%s ''',(book_id,))
+                my_cur.execute('''update customer_table
+                                  set cust_books=cust_books-1
+                                  where mem_id=%s''',(mem_id,))
+                my_cur.execute('''update issue_book_table
+                                  set submit_date=%s
+                                  where book_id=%s''',(submit_date,book_id))
 
-
+                my_cur.execute("commit")
+                            
+                            
 if __name__=='__main__':
     db=mysql.connector.connect(host="localhost",user="root",password="pass@word1")
     b=books()
@@ -60,16 +159,11 @@ if __name__=='__main__':
     4. Issue books 
     5. Submit books
     6. Delete books''')
-    b.add_book("Book1","auth1","sub1","2020-09-12",10,20,100)
-    b.add_book("Book21","auth2","sub2","2020-09-13",11,20,100)
-    b.add_book("Book3","auth3","sub3","2020-09-12",12,20,100)
-    b.add_book("Book1","auth1","sub1","2020-09-12",10,2,100)
-    b.add_book("Book3","auth3","sub3","2020-09-12",13,20,100)
-    b.delete_book(13)
-    data=b.search_book(Publication_date="2020-09-12")
-    #b.issue_book(b_name="Book21")
-    for i in data:
-        print(i)
+    b.deposit_book(12)
+    
+   
+
+    
     
     
    
